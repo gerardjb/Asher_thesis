@@ -10,13 +10,12 @@ Optional CLI arguments:
 """
 
 ## First, we'll go through standard library imports
-
 import mediapipe as mp
 from mediapipe import solutions
 from mediapipe.tasks import python # This was part of the recommended header, but I don't actually see it use in any of the demos
 from mediapipe.tasks.python import vision # ditto
 from mediapipe.framework.formats import landmark_pb2
-from mediapipe.tasks.python.vision import HandLandmarkerResult, PoseLandmarkerResult
+from mediapipe.tasks.python.vision import HandLandmarkerResult, PoseLandmarkerResult # These I pre-imported to grab indices of various keypoints
 import cv2
 import numpy as np
 import math
@@ -24,8 +23,9 @@ from os import makedirs
 import os
 import argparse
 import matplotlib.pyplot as plt
+import pandas as pd
 
-# Constants
+# --- Constants ---
 ## Define drawing constants (it looks like the PRESENCE and VISIBILITY fields don't actually do anything)
 HAND_PRESENCE_THRESHOLD = 0.5 # Min visibility/presence score to draw a landmark
 HAND_VISIBILITY_THRESHOLD = 0.5 # Min visibility to draw connection lines
@@ -35,6 +35,7 @@ RIGHT_INDEX_TIP_COLOR = (0, 0, 255)   # Red
 RIGHT_THUMB_TIP_COLOR = (255, 0, 0)   # Blue
 DEFAULT_LANDMARK_COLOR = (255, 255, 255) # White
 HAND_CONNECTION_COLOR = (200, 200, 200) # Light Gray for connections
+
 # Define landmark indices of interest
 HandLandmark = mp.solutions.hands.HandLandmark
 INDEX_FINGER_TIP_INDEX = HandLandmark.INDEX_FINGER_TIP.value # Typically 8
@@ -68,9 +69,13 @@ FACE_LANDMARK_INDICES = [
 LEFT_EYE_OUTER_INDEX = PoseLandmark.LEFT_EYE_OUTER.value if PoseLandmark else -1
 RIGHT_EYE_OUTER_INDEX = PoseLandmark.RIGHT_EYE_OUTER.value if PoseLandmark else -1
 
+# Create reverse mappings from index to name for easy lookup during saving to csv routine
+HAND_LANDMARK_NAMES = {lm.value: lm.name for lm in HandLandmark} if HandLandmark else {}
+POSE_LANDMARK_NAMES = {lm.value: lm.name for lm in PoseLandmark} if PoseLandmark else {}
+
 ## Define some constants for video processing
 ### E.g., if the video content needs to be rotated 90 degrees clockwise to be upright
-rotation_needed = False # Set to True if the video needs to be rotated
+rotation_needed = True # Set to True if the video needs to be rotated
 ROTATION_CODE = cv2.ROTATE_90_CLOCKWISE # options as expected from this - CLOCKWISE, COUNTERCLOCKWISE, 180
 
 # Updated version that accepts multiple landmark types and allows inclusion/exclusion of specific landmarks
@@ -319,7 +324,7 @@ def blur_face(rgb_image,detection_result):
     """"
     Blurs detected faces in the image to de-identify.
     Notes: - The facedetector does not work well when the subject is more than ~2 m away
-            - To counter this, I implemented a method based on the face keypoints in poselandmarker
+            - To counter this, I implemented a method based on the face keypoints in poselandmarker (see below)
     """
     annotated_image = np.copy(rgb_image)
     image_height, image_width, _ = annotated_image.shape
@@ -354,8 +359,7 @@ def blur_face(rgb_image,detection_result):
 
     return annotated_image
 
-# --- New Blur Function ---
-
+# New blur function that uses the pose landmarker to de-identify faces
 def blur_face_pose(rgb_image, pose_result: PoseLandmarkerResult):
     """
     Blacks out a square region around the face detected by PoseLandmarker.
@@ -363,7 +367,7 @@ def blur_face_pose(rgb_image, pose_result: PoseLandmarkerResult):
     The square's side length is calculated as 1.5 times the distance between
     the outer eye landmarks.
     The square is centered on the centroid (center of mass) of key face landmarks.
-    NOTE: This version does NOT check landmark visibility scores.
+    NOTE: This version does NOT check landmark visibility scores as mediapipe does not seem to have implemented a solution as of 0.10.20
 
     Args:
         rgb_image: The input image in RGB format (NumPy array).
@@ -459,7 +463,7 @@ def blur_face_pose(rgb_image, pose_result: PoseLandmarkerResult):
     # Side length is 1.5 times the eye distance. Ensure minimum size.
     # If eye_distance_px is 0 (e.g., landmarks perfectly overlap or calculation failed silently),
     # side_length will default to 10.
-    side_length = max(10, int(1.5 * eye_distance_px))
+    side_length = max(10, int(2 * eye_distance_px))
 
     # --- 4. Apply Black Square ---
     if side_length > 0:
@@ -490,6 +494,71 @@ def blur_face_pose(rgb_image, pose_result: PoseLandmarkerResult):
 
     return annotated_image
 
+# Method for saving the results to a CSV file
+def extract_landmarks_for_frame(frame_index, timestamp_ms, hand_result: HandLandmarkerResult, pose_result: PoseLandmarkerResult):
+    """
+    Extracts landmark data from MediaPipe results for a single frame.
+
+    Args:
+        frame_index: The index of the current video frame.
+        timestamp_ms: The timestamp of the current video frame in milliseconds.
+        hand_result: The HandLandmarkerResult object for the frame.
+        pose_result: The PoseLandmarkerResult object for the frame.
+
+    Returns:
+        A list of dictionaries, where each dictionary represents a single landmark's data.
+        Returns an empty list if no landmarks are detected in the frame.
+    """
+    frame_data = []
+
+    # --- Process Hand Landmarks ---
+    if hand_result.hand_landmarks:
+        # Ensure handedness list matches landmarks list length
+        if len(hand_result.handedness) == len(hand_result.hand_landmarks):
+            for instance_idx, landmarks in enumerate(hand_result.hand_landmarks):
+                # Get handedness label (usually the first classification is most confident)
+                handedness_label = "Unknown"
+                if hand_result.handedness[instance_idx]:
+                     handedness_label = hand_result.handedness[instance_idx][0].category_name
+
+                for landmark_idx, landmark in enumerate(landmarks):
+                    landmark_name = HAND_LANDMARK_NAMES.get(landmark_idx, f"UNKNOWN_{landmark_idx}")
+                    frame_data.append({
+                        'frame': frame_index,
+                        'timestamp_ms': timestamp_ms,
+                        'source': 'hand',
+                        'instance_id': instance_idx,
+                        'handedness': handedness_label,
+                        'landmark_id': landmark_idx,
+                        'landmark_name': landmark_name,
+                        'x': landmark.x,
+                        'y': landmark.y,
+                        'z': landmark.z,
+                    })
+        else:
+            print(f"Frame {frame_index}: Warning - Mismatch between hand landmarks ({len(hand_result.hand_landmarks)}) and handedness ({len(hand_result.handedness)}) counts.")
+
+
+    # --- Process Pose Landmarks ---
+    if pose_result.pose_landmarks:
+        for instance_idx, landmarks in enumerate(pose_result.pose_landmarks):
+            for landmark_idx, landmark in enumerate(landmarks):
+                landmark_name = POSE_LANDMARK_NAMES.get(landmark_idx, f"UNKNOWN_{landmark_idx}")
+                frame_data.append({
+                    'frame': frame_index,
+                    'timestamp_ms': timestamp_ms,
+                    'source': 'pose',
+                    'instance_id': instance_idx,
+                    'handedness': 'N/A', # Not applicable for pose
+                    'landmark_id': landmark_idx,
+                    'landmark_name': landmark_name,
+                    'x': landmark.x,
+                    'y': landmark.y,
+                    'z': landmark.z,
+                    # Note: Pose landmarks also have visibility, but we are ignoring it per user request.
+                })
+
+    return frame_data
 
 ## And next up, setting up our model and using it for the given dataset
 
@@ -603,11 +672,13 @@ out = cv2.VideoWriter(output_path, fourcc, new_fps, (output_width, output_height
 timestamps_ms = []
 frame_indexes = []
 hand_present_list = []
+all_landmarks_data = [] # List to hold all landmark data for CSV
 
 # Create  landmarker instances as needed for processing the video 
 with HandLandmarker.create_from_options(hand_options) as handmarker,\
     PoseLandmarker.create_from_options(pose_options) as posemarker,\
     FaceDetector.create_from_options(face_options) as facedetector:
+
     # Temp to make sure we have both instances open
     print("Hand Landmarker and  Face detector created successfully.")
     # read the video frame by frame for processing
@@ -639,6 +710,9 @@ with HandLandmarker.create_from_options(hand_options) as handmarker,\
         pose_result = posemarker.detect_for_video(mp_frame, timestamp_ms)
         face_detection_result = facedetector.detect_for_video(mp_frame, timestamp_ms)
 
+        # Load the landmark data to pd dataframe
+        frame_landmarks = extract_landmarks_for_frame(frame_index, timestamp_ms, result, pose_result)
+        all_landmarks_data.extend(frame_landmarks)
 
         # --- Processing video frame ---
         # Process the result (e.g., draw landmarks or save results)
@@ -667,6 +741,26 @@ with HandLandmarker.create_from_options(hand_options) as handmarker,\
 cap.release()
 out.release()
 cv2.destroyAllWindows()
+
+# After the loop, output df to csv
+if all_landmarks_data:
+    print(f"Collected data for {len(all_landmarks_data)} landmarks across all frames.")
+    # Create DataFrame
+    landmarks_df = pd.DataFrame(all_landmarks_data)
+
+    # Define output CSV file path
+    output_csv_dir = 'OutputCSVs'
+    os.makedirs(output_csv_dir, exist_ok=True)
+    output_csv_path = os.path.join(output_csv_dir, f'landmarks_{video_name_tag}.csv')
+
+    # Save to CSV
+    try:
+        landmarks_df.to_csv(output_csv_path, index=False)
+        print(f"Landmark data saved successfully to: {output_csv_path}")
+    except Exception as e:
+        print(f"Error saving landmark data to CSV: {e}")
+else:
+    print("No landmark data was collected to save.")
 
 # --- Plotting ---
 print("Video processing finished. Generating plot...")
