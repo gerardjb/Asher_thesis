@@ -22,6 +22,8 @@ import math
 from os import makedirs
 import os
 import argparse
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import pandas as pd
 
