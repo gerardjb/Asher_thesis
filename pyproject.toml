@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "PatientPoseAnalysis"
+version = "0.1.0"
+description = "Tools for analyzing Parkinson's assessment videos using MediaPipe." 
+authors = [
+  { name="Gerard Joey Broussard", email="gerardjb@princeton.edu" },
+]
+license = { text="MIT" } 
+readme = "README.md"
+
+# Specify Python compatibility based on MediaPipe's requirements
+# Check the specific version of MediaPipe you installed! For now, I've pinned 3.12 
+# for mediapipe 0.10.21 - fora suggests anything else may be problematic at this point
+requires-python = "==3.12.9"
+
+# Core dependencies needed to run the analysis tools and scripts
+dependencies = [
+    "mediapipe==0.10.21", # Specify version for now
+    "pandas",
+    "numpy",
+    "opencv-python",    
+    "matplotlib"
+]
+
+# Optional dependencies, grouped by purpose (e.g., testing, development)
+[project.optional-dependencies]
+test = [
+    "pytest",
+]
+
+# Allows finding your package code within the 'src' directory
+[tool.setuptools.packages.find]
+where = ["src"]
