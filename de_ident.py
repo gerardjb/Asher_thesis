@@ -750,7 +750,9 @@ with HandLandmarker.create_from_options(hand_options) as handmarker,\
         # --- Determine if face is present ---
         face_present = de_id_frame is not None and np.any(de_id_frame != frame_rgb)
         face_present_list.append(face_present)
-        frame_landmarks["face_present"] = face_present # Add face presence to landmarks data
+        # Add face presence to landmarks data was frame_landmarks["face_present"] = face_present 
+        for landmark in frame_landmarks:
+            landmark["face_present"] = face_present
         all_landmarks_data.extend(frame_landmarks)
 
         frame_index += 1
