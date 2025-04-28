@@ -671,7 +671,7 @@ else: # No rotation or 180 degrees
     output_height = original_height
 
 # Prepare the output video file path - note there are a limited number of backend codecs
-output_path = os.path.join('OutputVideos','Processed_'+video_name_tag+'.avi')
+output_path = os.path.join(VIDEO_DIR,'Processed_'+video_name_tag+'.avi')
 makedirs('OutputVideos', exist_ok=True)
 
 # Set up the VideoWriter for saving the processed video
@@ -769,7 +769,7 @@ if all_landmarks_data:
     # Define output CSV file path
     output_csv_dir = CSV_DIR
     os.makedirs(output_csv_dir, exist_ok=True)
-    output_csv_path = os.path.join(output_csv_dir, f'landmarks_{video_name_tag}.csv')
+    output_csv_path = os.path.join(output_csv_dir, f'landmarks_de_ident_{video_name_tag}.csv')
 
     # Save to CSV
     try:
