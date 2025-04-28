@@ -215,8 +215,8 @@ with HandLandmarker.create_from_options(hand_options) as handmarker:#, \
         # Define scaling factors for the added color channels (adjust these to taste)
         # Values > 1 will make the effect stronger but saturate faster.
         # Values < 1 will make the effect subtler.
-        laplacian_weight = 1.3  # How much Laplacian contributes to Red
-        motion_weight = 0.2     # How much Motion contributes to Green
+        laplacian_weight = 1  # How much Laplacian contributes to Red
+        motion_weight = 0.6     # How much Motion contributes to Green
 
         # Add Laplacian contribution to the Red channel (Channel 2 in BGR)
         if laplacian_img_abs_norm is not None:
@@ -229,9 +229,6 @@ with HandLandmarker.create_from_options(hand_options) as handmarker:#, \
 
             # Clip the result to 0-255 and convert back to uint8
             composite_frame[:, :, 2] = np.clip(new_r_float, 0, 255).astype(np.uint8)
-            # Alternatively, use cv2.add for potentially faster saturation clipping:
-            # lap_scaled_u8 = cv2.convertScaleAbs(laplacian_img_abs_norm, alpha=laplacian_weight)
-            # composite_frame[:, :, 2] = cv2.add(composite_frame[:, :, 2], lap_scaled_u8)
 
 
         # Add Motion contribution to the Green channel (Channel 1 in BGR)

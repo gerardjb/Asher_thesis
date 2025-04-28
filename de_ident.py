@@ -23,7 +23,7 @@ from os import makedirs
 import os
 import argparse
 import matplotlib
-matplotlib.use('Agg')
+#matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import pandas as pd
 
@@ -674,6 +674,7 @@ out = cv2.VideoWriter(output_path, fourcc, new_fps, (output_width, output_height
 timestamps_ms = []
 frame_indexes = []
 hand_present_list = []
+face_present_list = []
 all_landmarks_data = [] # List to hold all landmark data for CSV
 
 # Create  landmarker instances as needed for processing the video 
@@ -737,6 +738,10 @@ with HandLandmarker.create_from_options(hand_options) as handmarker,\
         hand_present = len(result.hand_landmarks) > 0
         hand_present_list.append(hand_present)
 
+        # --- Determine if face is present ---
+        face_present = de_id_frame is not None and np.any(de_id_frame != frame_rgb)
+        face_present_list.append(face_present)
+
         frame_index += 1
 
 # Release the video capture
@@ -771,14 +776,14 @@ fig, ax = plt.subplots(figsize=(6, 3)) # Adjust figure size as needed
 #fig, ax = plt.subplots(2, 1, figsize=(12, 9), sharex=True) 
 
 # Plot the data
-ax.plot(timestamps_ms, hand_present_list, label='Hand presence', color='black', marker='.', linestyle='-', markersize=4)
+ax.plot(timestamps_ms, face_present_list, label='Face presence', color='black', marker='.', linestyle='-', markersize=4)
 #ax.plot(timestamps_ms, right_thumb_tip_y_coords, label='Right Thumb Tip', color='red', marker='.', linestyle='-', markersize=4)
 #ax[0].plot(frame_indexes, right_index_tip_y_coords, label='Right Index Tip Y', color='red', marker='.', linestyle='-', markersize=4)
 #ax[0].plot(frame_indexes, right_thumb_tip_y_coords, label='Right Thumb Tip Y', color='blue', marker='.', linestyle='-', markersize=4)
 
 # Customize the plot
 ax.set_xlabel("Timestamp (milliseconds)",fontsize=12) # Or "Frame Number" if using frame_count
-ax.set_ylabel("Hand Detected (y=1, n=0)",fontsize=12)
+ax.set_ylabel("Face Detected (y=1, n=0)",fontsize=12)
 #ax.set_title("Simulated Fingertap Bradykinesia")
 #ax.legend(fontsize=12) # Show the legend
 ax.grid(True) # Add grid lines
