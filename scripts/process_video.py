@@ -211,13 +211,15 @@ with HandLandmarker.create_from_options(hand_options) as handmarker:#, \
         # Start with the grayscale frame converted to BGR
         # This sets the base intensity for all channels
         composite_frame = cv2.cvtColor(current_gray_frame, cv2.COLOR_GRAY2BGR)
-
+        composite_frame[:,:,0] = current_gray_frame
+        composite_frame[:,:,1] = laplacian_img_abs_norm.astype(np.uint8) if laplacian_img_abs_norm is not None else current_gray_frame
+        composite_frame[:,:,2] = diff_image_norm.astype(np.uint8) if diff_image_norm is not None else current_gray_frame
         # Define scaling factors for the added color channels (adjust these to taste)
         # Values > 1 will make the effect stronger but saturate faster.
         # Values < 1 will make the effect subtler.
-        laplacian_weight = 1  # How much Laplacian contributes to Red
-        motion_weight = 0.6     # How much Motion contributes to Green
-
+        # laplacian_weight = 1  # How much Laplacian contributes to Red
+        # motion_weight = 0.6     # How much Motion contributes to Green
+        """
         # Add Laplacian contribution to the Red channel (Channel 2 in BGR)
         if laplacian_img_abs_norm is not None:
             # Convert channels to float32 for addition to avoid premature uint8 clipping
@@ -245,7 +247,7 @@ with HandLandmarker.create_from_options(hand_options) as handmarker:#, \
             # Alternatively, use cv2.add:
             # mot_scaled_u8 = cv2.convertScaleAbs(diff_image_norm, alpha=motion_weight)
             # composite_frame[:, :, 1] = cv2.add(composite_frame[:, :, 1], mot_scaled_u8)
-
+        """
 
         # Draw ONLY right index and thumb tips as white circles
         if hand_result.hand_landmarks and hand_result.handedness:

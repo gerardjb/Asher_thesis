@@ -28,6 +28,15 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 # --- Constants ---
+OUTPUT_DIR = "output" # Base output directory
+VIDEO_DIR = os.path.join(OUTPUT_DIR, "OutputVideos")
+CSV_DIR = os.path.join(OUTPUT_DIR, "OutputCSVs")
+PLOT_DIR = os.path.join(OUTPUT_DIR, "OutputPlots")
+# Create directories if they don't exist
+os.makedirs(VIDEO_DIR, exist_ok=True)
+os.makedirs(CSV_DIR, exist_ok=True)
+os.makedirs(PLOT_DIR, exist_ok=True)
+
 ## Define drawing constants (it looks like the PRESENCE and VISIBILITY fields don't actually do anything)
 HAND_PRESENCE_THRESHOLD = 0.5 # Min visibility/presence score to draw a landmark
 HAND_VISIBILITY_THRESHOLD = 0.5 # Min visibility to draw connection lines
@@ -715,7 +724,7 @@ with HandLandmarker.create_from_options(hand_options) as handmarker,\
 
         # Load the landmark data to pd dataframe
         frame_landmarks = extract_landmarks_for_frame(frame_index, timestamp_ms, result, pose_result)
-        all_landmarks_data.extend(frame_landmarks)
+        
 
         # --- Processing video frame ---
         # Process the result (e.g., draw landmarks or save results)
@@ -741,6 +750,8 @@ with HandLandmarker.create_from_options(hand_options) as handmarker,\
         # --- Determine if face is present ---
         face_present = de_id_frame is not None and np.any(de_id_frame != frame_rgb)
         face_present_list.append(face_present)
+        frame_landmarks["face_present"] = face_present # Add face presence to landmarks data
+        all_landmarks_data.extend(frame_landmarks)
 
         frame_index += 1
 
@@ -756,7 +767,7 @@ if all_landmarks_data:
     landmarks_df = pd.DataFrame(all_landmarks_data)
 
     # Define output CSV file path
-    output_csv_dir = 'OutputCSVs'
+    output_csv_dir = CSV_DIR
     os.makedirs(output_csv_dir, exist_ok=True)
     output_csv_path = os.path.join(output_csv_dir, f'landmarks_{video_name_tag}.csv')
 
@@ -791,14 +802,13 @@ ax.grid(True) # Add grid lines
 
 
 # Save the plot - deactivated for now, but keep hand detect viz to allow output assessment
-"""output_plot_filename = os.path.join('FigPlots','hand_presence'+video_name_tag+'.jpg')
+output_plot_filename = os.path.join(PLOT_DIR,'face_presence'+video_name_tag+'.jpg')
 makedirs('FigPlots', exist_ok=True)
 try:
     plt.savefig(output_plot_filename, format='jpg', dpi=300, bbox_inches='tight')
     print(f"Plot saved successfully as: {output_plot_filename}")
 except Exception as e:
     print(f"Error saving plot: {e}")
-"""
 
 # Optionally display the plot interactively
 plt.show()
